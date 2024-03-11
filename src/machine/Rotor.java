@@ -71,7 +71,9 @@ public class Rotor {
         int offset = this.position - this.ringSetting;
         int[] wiring = (inverse) ? this.inverseWiring : this.wiring;
         // `%` in Java is 'remainder' which can return a negative value
-        return (26 + (wiring[(ordC + offset) % 26] - offset)) % 26;
+        // solution:
+        // https://stackoverflow.com/questions/4412179/best-way-to-make-javas-modulus-behave-like-it-should-with-negative-numbers/4412200#4412200
+        return ((wiring[((ordC + offset) % 26 + 26) % 26] - offset) % 26 + 26) % 26;
     }
 
     public String toString() {

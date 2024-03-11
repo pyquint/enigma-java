@@ -3,7 +3,7 @@ package src.machine;
 import java.util.HashMap;
 
 public class Enigma {
-    Rotor[] rotors;
+    public Rotor[] rotors;
     String plaintext;
     String ciphertext;
 
@@ -42,14 +42,12 @@ public class Enigma {
         this.setPlugboard(plugboardPairs);
     }
 
-    public String encrypt(String plaintext, char sep) {
-        char[] ciphertext = new char[plaintext.length()];
-        int i = 0;
+    public String encrypt(String plaintext, String sep) {
+        StringBuilder ciphertext = new StringBuilder();
         for (char c : plaintext.toUpperCase().toCharArray()) {
-            ciphertext[i] = (c >= 'A' && c <= 'Z') ? cipher(c) : sep;
-            i++;
+            ciphertext.append((c >= 'A' && c <= 'Z') ? cipher(c) : sep);
         }
-        return new String(ciphertext);
+        return ciphertext.toString();
     }
 
     public char cipher(char c) {
@@ -59,8 +57,8 @@ public class Enigma {
             ec = this.rotors[i].wiringOf(ec, false);
         }
         ec = this.reflector[ec];
-        for (int j = 0; j < 3; j++) {
-            ec = this.rotors[j].wiringOf(ec, true);
+        for (Rotor rotor : this.rotors) {
+            ec = rotor.wiringOf(ec, true);
         }
         return getPlugboardPair((char) (ec % 26 + 65));
     }
@@ -75,7 +73,26 @@ public class Enigma {
             for (String pair : pairs) {
                 p = pair.toUpperCase().toCharArray();
                 this.plugboard.put(p[0], p[1]);
+                this.plugboard.put(p[1], p[0]);
             }
+        }
+    }
+
+    public void setWheels(String[] wheels) {
+        for (int i = 0; i < 3; i++) {
+            this.rotors[i].setWheel(wheels[i]);
+        }
+    }
+
+    public void setRingSettings(int[] ringSettings) {
+        for (int i = 0; i < 3; i++) {
+            this.rotors[i].setRingSetting(ringSettings[i]);
+        }
+    }
+
+    public void setPositions(int[] positions) {
+        for (int i = 0; i < 3; i++) {
+            this.rotors[i].setPosition(positions[i]);
         }
     }
 
@@ -88,5 +105,11 @@ public class Enigma {
             this.rotors[1].turn();
         }
         this.rotors[2].turn();
+    }
+
+    public void resetPositions() {
+        for (Rotor rotor : this.rotors) {
+            rotor.position = rotor.initialPos;
+        }
     }
 }
