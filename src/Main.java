@@ -4,8 +4,6 @@ import src.machine.Decryptor;
 import src.machine.Enigma;
 import src.machine.Rotor;
 
-import java.util.Arrays;
-
 // compile first then run
 
 // Inspired by Mike Pound's demonstration on Computerphile

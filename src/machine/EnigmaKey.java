@@ -37,7 +37,7 @@ public class EnigmaKey {
      * @see #EnigmaKey(String[], int[], int[], String[]) 
      */
     public EnigmaKey(EnigmaKey key) {
-        wheels = key.wheels == null ? null : Arrays.copyOf(key.wheels, 3);;
+        wheels = key.wheels == null ? null : Arrays.copyOf(key.wheels, 3);
         rings = key.rings == null ? null : Arrays.copyOf(key.rings, 3);
         positions = key.positions == null ? null : Arrays.copyOf(key.positions, 3);
         pairs = key.pairs;
