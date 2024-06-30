@@ -19,9 +19,10 @@ public class Rotor {
     }
 
     public void setWheel(String wheel) {
+        verifyNonNull(wheel, "wheel");
+
         this.wheel = wheel;
         this.turnover = turnoverOf(wheel);
-
         String wiring = wiringOf(wheel);
 
         for (int i = 0; i < 26; i++) {
@@ -38,7 +39,7 @@ public class Rotor {
             case "III" -> "BDFHJLCPRTXVZNYEIWGAKMUSQO";
             case "IV" -> "ESOVPZJAYQUIRHXLNFTGKDCMWB";
             case "V" -> "VZBRGITYUPSDNHLXAWMJQOFECK";
-            default -> "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            default -> throw new IllegalArgumentException("unsupported wheel type");
         };
     }
 
@@ -48,15 +49,18 @@ public class Rotor {
             case "II" -> 4;
             case "III" -> 21;
             case "IV" -> 9;
-            default -> 25;
+            case "V" -> 25;
+            default -> throw new IllegalArgumentException("unsupported wheel type");
         };
     }
 
     public void setRingSetting(int ringSetting) {
+        verifyInteger(ringSetting, "ringSetting");
         this.ringSetting = ringSetting;
     }
 
     public void setPosition(int position) {
+        verifyInteger(position, "position");
         this.position = position;
         this.initialPos = position;
     }
@@ -71,6 +75,10 @@ public class Rotor {
         return mod((wiring[mod((ordC + offset), 26) % 26] - offset), 26);
     }
 
+    public boolean atTurnover() {
+        return this.position == this.turnover;
+    }
+
     public String toString() {
         return String.format("Rotor(wheel=%s, ringSetting=%d, position=%d)", this.wheel, this.ringSetting,
                 this.position);
@@ -80,7 +88,11 @@ public class Rotor {
         return Math.abs(Math.floorMod(n, mod));
     }
 
-    public boolean atTurnover() {
-        return this.position == this.turnover;
+    protected void verifyNonNull(Object o, String parameter) {
+        if (o == null) throw new IllegalArgumentException("`" + parameter + "' must not be null");
+    }
+
+    protected void verifyInteger(int n, String parameter) {
+        if (n < 0 || n > 26) throw new IllegalArgumentException("`" + parameter + "` must be within 0-26 inclusive (passed `" + n  + "`)");
     }
 }

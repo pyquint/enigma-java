@@ -4,16 +4,24 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 
-
+/**
+ * Java implementation of the 3-rotor Enigma (model M3) used during
+ * WWII by the German Navy (Kriegsmarine).
+ * <p>
+ * (The M3 used letters rather than numbers for the rotor positions.
+ * This implementation uses zero-indexing for speed and simplicity.)
+ */
 public class Enigma {
-    private final Rotor[] rotors;
-    private String reflectorModel;
-    private int[] reflector;
-    private final HashMap<Character, Character> plugboard;
+    public final int ROTOR_COUNT = 3;
+    public final int LETTER_COUNT = 26;
+
     private String[] pairs;
+    private String reflectorModel;
+    private final int[] reflector = new int[LETTER_COUNT];
+    private final Rotor[] rotors = new Rotor[ROTOR_COUNT];
+    private final HashMap<Character, Character> plugboard = new HashMap<>();
 
     /**
-     * <p>
      * Java implementation of the 3-rotor Enigma (model M3) used during
      * WWII by the German Navy (Kriegsmarine).
      * <p>
@@ -23,73 +31,63 @@ public class Enigma {
      * @param wheels         wheel order, array of three I - V exclusive
      * @param rings          ring settings, array of three 0 - 25
      * @param positions      initial rotor position, array of three 0 - 25
-     * @param reflectorModel reflector model, 'B' or 'C'
+     * @param reflectorModel reflector model, "B" or "C"
      * @param pairs          plugboard settings, array of letter pairs
+     *
+     * @see #Enigma(EnigmaKey)
      */
-    public Enigma(String[] wheels,
-                  int[] rings,
-                  int[] positions,
-                  String reflectorModel,
-                  String[] pairs) {
-
-        this.rotors = new Rotor[3];
-
-        for (int i = 0; i < 3; i++) {
+    public Enigma(String[] wheels, int[] rings, int[] positions, String reflectorModel, String[] pairs) {
+        for (int i = 0; i < ROTOR_COUNT; i++) {
             this.rotors[i] = new Rotor(wheels[i], rings[i], positions[i]);
         }
-
         setReflector(reflectorModel);
-
-        this.plugboard = new HashMap<>();
-        this.setPlugboard(pairs);
+        setPlugboard(pairs);
     }
 
+    /**
+     * Java implementation of the 3-rotor Enigma (model M3) used during
+     * WWII by the German Navy (Kriegsmarine).
+     * <p>
+     * (The M3 used letters rather than numbers for the rotor positions.
+     * This implementation uses zero-indexing for speed and simplicity.)
+     *
+     * @param key    {@link EnigmaKey} populated with settings
+     *
+     * @see #Enigma(String[], int[], int[], String, String[])
+     */
     public Enigma(EnigmaKey key) {
         this(key.wheels, key.rings, key.positions, "B", key.pairs);
     }
 
+    /**
+     * Factory method that creates an {@link Enigma} object with these predefined parameters:
+     * <ul>
+     *     <li>{@code wheels} = {@code ["I", "II", "III"]}</li>
+     *     <li>{@code rings} = {@code [0, 0, 0]}</li>
+     *     <li>{@code positions} = {@code [0, 0, 0]}</li>
+     *     <li>{@code reflectorModel} = {@code "B"}</li>
+     *     <li>{@code pairs} = {@code []}</li>
+     * </ul>
+     *
+     * @return {@link Enigma} object
+     */
     public static Enigma createDefault() {
         return new Enigma(
                 new String[]{"I", "II", "III"},
-                DefaultRotorConfig(),
-                DefaultRotorConfig(),
+                new int[]{0, 0, 0},
+                new int[]{0, 0, 0},
                 "B",
                 new String[]{}
         );
     }
 
-    public static String[] Wheels(int n) {
-        return switch (n) {
-            case 3 -> new String[]{"I", "II", "III"};
-            case 5 -> new String[]{"I", "II", "III", "IV", "V"};
-            case 8 -> new String[]{"I", "II", "III", "IV", "V", "VI", "VII", "VIII"};
-            default -> throw new RuntimeException("Invalid n. Must be 3 5, 8.");
-        };
-    }
-
-    public static int[] DefaultRotorConfig() {
-        return new int[]{0, 0, 0};
-    }
-
     public static Enigma copyOf(Enigma e) {
-        return new Enigma(e.getRotorWheels(), e.getRingSettings(), e.getRotorPositions(), "B", e.getPluggedPairs());
-    }
-
-    public void setReflector(String model) {
-        this.reflectorModel = model;
-        String reflector = reflectorWiringOf(model);
-        this.reflector = new int[26];
-
-        for (int i = 0; i < 26; i++) {
-            this.reflector[i] = reflector.charAt(i) - 65;
-        }
-    }
-
-    public String encrypt(String plaintext) {
-        return encrypt(plaintext, "");
+        return new Enigma(e.getWheels(), e.getRingSettings(), e.getPositions(), "B", e.getPluggedPairs());
     }
 
     public String encrypt(String plaintext, String sep) {
+        verifyNonNull(plaintext, "plaintext");
+
         return plaintext
                 .toUpperCase()
                 .chars()
@@ -103,9 +101,9 @@ public class Enigma {
                 .replaceAll(" ", sep);
     }
 
-    public char cipher(char c) {
+    protected char cipher(char c) {
         turnRotors();
-        int ec = getPlugboardPair(c) - 65;
+        int ec = getPairOf(c) - 65;
         for (int i = 2; i >= 0; i--) {
             ec = this.rotors[i].wiringOf(ec, false);
         }
@@ -113,61 +111,162 @@ public class Enigma {
         for (Rotor rotor : this.rotors) {
             ec = rotor.wiringOf(ec, true);
         }
-        return getPlugboardPair((char) (ec % 26 + 65));
+        return getPairOf((char) (ec % LETTER_COUNT + 65));
     }
 
-    public char getPlugboardPair(char c) {
+    public char getPairOf(char c) {
         return plugboard.getOrDefault(c, c);
     }
 
-    public void setPlugboard(Collection<String> pairs) {
-        String[] toPass = (pairs != null) ? pairs.toArray(new String[0]) : null;
-        setPlugboard(toPass);
-    }
+    public void setReflector(String model) {
+        this.reflectorModel = model;
+        String reflector = reflectorWiringOf(model);
 
-    public void setPlugboard(String[] pairs) {
-        this.pairs = pairs;
-        this.plugboard.clear();
-
-        if (pairs != null && pairs.length > 0) {
-            char[] p;
-            for (String pair : pairs) {
-                p = pair.toUpperCase().toCharArray();
-                this.plugboard.put(p[0], p[1]);
-                this.plugboard.put(p[1], p[0]);
-            }
+        for (int i = 0; i < LETTER_COUNT; i++) {
+            this.reflector[i] = reflector.charAt(i) - 65;
         }
     }
 
-    public void resetPlugboard() {
-        this.pairs = new String[]{};
-        this.plugboard.clear();
+    public static String reflectorWiringOf(String reflectorModel) {
+        return switch (reflectorModel) {
+            case "B" -> "YRUHQSLDPXNGOKMIEBFZCWVJAT";
+            case "C" -> "RDOBJNTKVEHMLFCWZAXGYIPSUQ";
+            default -> throw new IllegalArgumentException("reflector must be \"B\" or \"C\".");
+        };
     }
 
+    /**
+     * @param pairs     {@link Collection} of {@link String} letter pairs, e.g. {@code List.of("ab", "cd")}
+     * @throws IllegalArgumentException <br>
+     * if {@code pairs} is {@code null},<br>
+     * if an element is {@code null},<br>
+     * if the String element is not of length two,<br>
+     * if the characters are not letters,<br>
+     * if one of the letters is already paired
+     *
+     * @see #getPluggedPairs()
+     */
+    public void setPlugboard(Collection<String> pairs) {
+        setPlugboard( pairs == null ? null : pairs.toArray(new String[0]) );
+    }
+
+    /**
+     * @param pairs     Array of {@link String} letter pairs, e.g. {@code ["ab", "cd"]}
+     * @throws IllegalArgumentException <br>
+     * if {@code pairs} is {@code null},<br>
+     * if an element is {@code null},<br>
+     * if the String element is not of length two,<br>
+     * if the characters are not letters,<br>
+     * if one of the letters is already paired
+     *
+     * @see #getPluggedPairs()
+     */
+    public void setPlugboard(String[] pairs) {
+        verifyNonNull(pairs, "pairs");
+
+        plugboard.clear();
+        String[] pairsTemp = new String[pairs.length];
+
+        for (int i = 0; i < pairs.length; i++) {
+            verifyNonNull(pairs[i], "pair");
+
+            char[] p = pairs[i].toUpperCase().toCharArray();
+            char p1 = p[0];
+            char p2 = p[1];
+
+            if (p.length != 2 || !(isValidLetter(p1) && isValidLetter(p2))) throw new IllegalArgumentException("pair must be a string of two letters");
+
+            if (plugboard.containsKey(p1) || plugboard.containsKey(p2)) throw new IllegalArgumentException("one of the letters is already paired: `" + p1 +  p2 + "`");
+
+            plugboard.put(p1, p2);
+            plugboard.put(p2, p1);
+            pairsTemp[i] = p1 + "" + p2;
+        }
+
+        this.pairs = pairsTemp;
+    }
+
+    /**
+     * @param wheels     String array of length three to set three rotors.
+     *
+     * @see #setWheels(String, String, String) 
+     * @see #getWheels()
+     */
     public void setWheels(String[] wheels) {
-        for (int i = 0; i < 3; i++) {
+        verifyNonNull(wheels, "wheels");
+        verifyArrayLength(wheels, "wheels");
+
+        for (int i = 0; i < ROTOR_COUNT; i++) {
             this.rotors[i].setWheel(wheels[i]);
         }
     }
 
+    /**
+     * @param w0    wheel at leftmost rotor
+     * @param w1    wheel at middle rotor
+     * @param w2    wheel at rightmost rotor
+     *
+     * @see #setWheels(String[]) 
+     * @see #getWheels()
+     */
     public void setWheels(String w0, String w1, String w2) {
         this.rotors[0].setWheel(w0);
         this.rotors[1].setWheel(w1);
         this.rotors[2].setWheel(w2);
     }
 
+    /**
+     * @param ringSettings     integer array of length three to set three rotors.
+     *
+     * @see #setRingSettings(int, int, int) 
+     * @see #getRingSettings()
+     */
+    public void setRingSettings(int[] ringSettings) {
+        verifyNonNull(ringSettings, "ringSettings");
+        verifyArrayLength(ringSettings, "ringSettings");
+
+        for (int i = 0; i < ROTOR_COUNT; i++) {
+            this.rotors[i].setRingSetting(ringSettings[i]);
+        }
+    }
+
+    /**
+     * @param r0    ring setting at leftmost rotor
+     * @param r1    ring setting at middle rotor
+     * @param r2    ring setting at rightmost rotor
+     *
+     * @see #setRingSettings(int[]) 
+     * @see #getRingSettings()
+     */
     public void setRingSettings(int r0, int r1, int r2) {
         this.rotors[0].setRingSetting(r0);
         this.rotors[1].setRingSetting(r1);
         this.rotors[2].setRingSetting(r2);
     }
 
+    /**
+     * @param positions     integer array of length three to set three rotors.
+     *
+     * @see #setPositions(int, int, int) 
+     * @see #getPositions()
+     */
     public void setPositions(int[] positions) {
-        for (int i = 0; i < 3; i++) {
+        verifyNonNull(positions, "positions");
+        verifyArrayLength(positions, "positions");
+
+        for (int i = 0; i < ROTOR_COUNT; i++) {
             this.rotors[i].setPosition(positions[i]);
         }
     }
 
+    /**
+     * @param p0    position at leftmost rotor
+     * @param p1    position at middle rotor
+     * @param p2    position at rightmost rotor
+     *
+     * @see #setPositions(int[]) 
+     * @see #getPositions()
+     */
     public void setPositions(int p0, int p1, int p2) {
         this.rotors[0].setPosition(p0);
         this.rotors[1].setPosition(p1);
@@ -185,57 +284,130 @@ public class Enigma {
         this.rotors[2].turn();
     }
 
+    /**
+     * Resets the {@code position} of each {@link Rotor} to the ones initialized during object creation or through the setter methods.
+     *
+     * @see #getPositions()
+     * @see #setPositions(int[])
+     * @see #setPositions(int, int, int)
+     */
     public void resetPositions() {
         for (Rotor rotor : this.rotors) {
             rotor.position = rotor.initialPos;
         }
     }
 
-    public String reflectorWiringOf(String reflectorModel) {
-        return switch (reflectorModel) {
-            case "B" -> "YRUHQSLDPXNGOKMIEBFZCWVJAT";
-            case "C" -> "RDOBJNTKVEHMLFCWZAXGYIPSUQ";
-            default -> "ABDCEFGHIJKLMNOPQRSTUVWXYZ";
-        };
+    public void resetPlugboard() {
+        this.pairs = new String[]{};
+        this.plugboard.clear();
     }
 
-    public String[] getRotorWheels() {
+    /**
+     * This returns a new copy to get a view the current wheel types per rotor.
+     * <p>
+     * Any changes to that will not reflect to the internal states.
+     *
+     * @return {@link String} array object of length three.
+     *
+     * @see #setWheels(String[])
+     * @see #setWheels(String, String, String)
+     */
+    public String[] getWheels() {
         return new String[]{rotors[0].wheel, rotors[1].wheel, rotors[2].wheel};
     }
 
+    /**
+     * This returns a new copy to get a view of the current {@code rings} per {@link Rotor}.
+     * <p>
+     * Any changes to that will not reflect to the internal states.
+     *
+     * @return {@code int} array object of length three.
+     *
+     * @see #setPlugboard(String[])
+     * @see #setPlugboard(Collection)
+     */
     public int[] getRingSettings() {
         return new int[]{rotors[0].ringSetting, rotors[1].ringSetting, rotors[2].ringSetting};
     }
 
-    public void setRingSettings(int[] ringSettings) {
-        for (int i = 0; i < 3; i++) {
-            this.rotors[i].setRingSetting(ringSettings[i]);
-        }
+    /**
+     * This returns a new copy to get a view of the current rotor positions per rotor.
+     * <p>
+     * Any changes to that will not reflect to the internal states.
+     *
+     * @return {@code int} array object of length three.
+     *
+     * @see #setPositions(int[])
+     * @see #setPositions(int, int, int)
+     */
+    public int[] getPositions() {
+        return new int[]{rotors[0].position, rotors[1].position, rotors[2].position};
     }
 
-    public int[] getRotorPositions() {
-        return new int[]{rotors[0].position, rotors[1].position, rotors[2].position};
+    /**
+     * The plugboard pairs initialized during object creation must not be directly modified.
+     * <p>
+     * This returns a new copy. Any changes to that will not reflect to the internal states.
+     *
+     * @return new {@link Rotor} array object
+     *
+     * @see #setPlugboard(String[])
+     * @see #setPlugboard(Collection)
+     */
+    public String[] getPluggedPairs() {
+        return Arrays.copyOf(pairs, pairs.length);
+    }
+
+    /**
+     * The three {@link Rotor} initialized during object creation must not be directly modified.
+     * <p>
+     * This returns a new copy. Any changes to that will not reflect to the internal states.
+     *
+     * @return new {@link Rotor} array object
+     *
+     * @see #setWheels(String[])
+     * @see #setWheels(String, String, String)
+     * @see #setRingSettings(int[])
+     * @see #setRingSettings(int, int, int)
+     * @see #setPositions(int[])
+     * @see #setPositions(int, int, int)
+     */
+    public Rotor[] getRotors() {
+        return Arrays.copyOf(rotors, rotors.length);
+    }
+
+    /**
+     * Changes done to the returned {@link EnigmaKey} will not reflect to the internal states.
+     *
+     * @return {@link EnigmaKey} snapshot key of the machine's current rotor states and plugboard pairs.
+     */
+    public EnigmaKey getEnigmaKeu() {
+        return new EnigmaKey(getWheels(), getRingSettings(), getPositions(), pairs);
     }
 
     public String toString() {
         return String.format("Enigma(wheels=%s, ringSettings=%s, rotorPositions=%s, reflectorModel=%s, pairs=%s)",
-                Arrays.toString(getRotorWheels()),
+                Arrays.toString(getWheels()),
                 Arrays.toString(getRingSettings()),
-                Arrays.toString(getRotorPositions()),
+                Arrays.toString(getPositions()),
                 reflectorModel,
                 Arrays.toString(pairs)
         );
     }
 
-    public String[] getPluggedPairs() {
-        return (pairs != null) ? pairs : new String[]{};
+    protected boolean isValidLetter(char c) {
+        return c >= 'A' && c <= 'Z';
     }
 
-    public EnigmaKey getEnigmaKeu() {
-        return new EnigmaKey(getRotorWheels(), getRingSettings(), getRotorPositions(), getPluggedPairs());
+    protected void verifyArrayLength(Object[] o, String parameter) {
+        if (o.length != ROTOR_COUNT) throw new IllegalArgumentException("`" + parameter + "` must be of length three.");
     }
 
-    public Rotor[] getRotors() {
-        return rotors;
+    protected void verifyArrayLength(int[] o, String parameter) {
+        if (o.length != ROTOR_COUNT) throw new IllegalArgumentException("`" + parameter + "` must be of length three.");
+    }
+
+    private void verifyNonNull(Object o, String parameter) {
+        if (o == null) throw new IllegalArgumentException("`" + parameter + "' must not be null");
     }
 }
