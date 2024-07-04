@@ -23,6 +23,10 @@ public class ScoredEnigmaKey extends EnigmaKey implements Comparable<ScoredEnigm
         this.score = score;
     }
 
+    public double score() {
+        return score;
+    }
+
     @Override
     public int compareTo(ScoredEnigmaKey o) {
         return Double.compare(this.score, o.score);
@@ -30,6 +34,6 @@ public class ScoredEnigmaKey extends EnigmaKey implements Comparable<ScoredEnigm
 
     @Override
     public String toString() {
-        return "[ %s, score=%f ]".formatted(super.toString(), score);
+        return "ScoredEnigmaKey[%s, score=%f]".formatted(prettyKey(), score);
     }
 }

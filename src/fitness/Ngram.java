@@ -5,8 +5,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
-public class Ngram {
+public class Ngram implements Analysis {
     private final int n;
     private final HashMap<String, Double> ngramMap;
 
@@ -21,16 +22,16 @@ public class Ngram {
         this.n = ngram;
         this.ngramMap = new HashMap<>();
 
-        try {
-            Files.lines(new File("data/" + n + "grams.txt").toPath())
-                    .map(l -> l.split(","))
+        try (Stream<String> stream = Files.lines(new File("data/" + n + "grams.txt").toPath())) {
+            stream.map(l -> l.split(","))
                     .forEach(l -> ngramMap.put(l[0], Double.valueOf(l[1])));
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException(e.getMessage());
         }
     }
 
-    public Double score(String text) {
+    @Override
+    public double score(String text) {
         return IntStream
                 .range(0, text.length() - (n - 1))
                 .mapToObj(i -> text.substring(i, n + i))

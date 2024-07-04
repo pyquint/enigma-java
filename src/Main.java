@@ -1,8 +1,11 @@
 package src;
 
+import src.fitness.ScoredEnigmaKey;
 import src.machine.Decryptor;
 import src.machine.Enigma;
 import src.machine.Rotor;
+
+import java.util.Optional;
 
 // compile first then run
 
@@ -60,7 +63,13 @@ public class Main {
         // imitation game no plugs - ("V", "IV", "I"), (1, 15, 23), (22, 22, 1)
         // imitation game w/plugs  - ("V", "IV", "I"), (7, 20, 19), (1, 15, 23), ("sx", "bp", "eu", "nz")
 
-        Decryptor decryptor = new Decryptor(imitationGameNoPlugs, 4, 2);
-        decryptor.decrypt();
+        var test = imitationGameWithPlugs;
+
+        Decryptor decryptor = new Decryptor(test);
+        ScoredEnigmaKey bestKey = decryptor.decrypt();
+        System.out.println();
+        Enigma e = new Enigma(bestKey);
+        System.out.println("Best key: " + bestKey);
+        System.out.println(e.encrypt(test, ""));
     }
 }

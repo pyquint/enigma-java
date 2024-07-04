@@ -1,5 +1,6 @@
 package src.machine;
 
+import src.fitness.Analysis;
 import src.fitness.IoC;
 import src.fitness.Ngram;
 import src.fitness.ScoredEnigmaKey;
@@ -9,74 +10,95 @@ import java.util.stream.Collectors;
 
 public class Decryptor {
 
-
     private final String ciphertext;
-    private final Ngram ngram;
-    private final int limit;
-
 
     /**
-     * <p>
-     * This class can attempt to decrypt ciphertext using William's method that extends Gillogly's.
-     * <p>
-     * Gillogly's method:
-     *  <ul>
-     *      <li>Phase 1: Get the best wheel & rotor position (Index of Coincidence)</li>
-     *      <li>Phase 2: Get the best ring setting, using Phase 1 setting (Index of Coincidence)</li>
-     *      <li>Phase 3: Get the best plug setting, using Phase 2 setting (n-grams)</li>
-     * </ul>
-     * <p>
-     * William's method extends Gillogly's by utilizing 3,000 of the  best wheel & rotor position from Phase 1
-     * instead of just the singular best, which might not be the correct key once processed to the next phases.
-     * <p>
-     * Gillogly's paper:<br>
-     * CIPHERTEXT-ONLY CRYPTANALYSIS OF ENIGMA, James J. Gillogly, 1995, <a href="https://web.archive.org/web/20060720040135/http://members.fortunecity.com/jpeschel/gillog1.htm">web.archive.org</a>
-     * <p>
-     * William's paper:<br>
-     * APPLYING STATISTICAL LANGUAGE RECOGNITION TECHNIQUES IN THE CIPHERTEXT-ONLY CRYPTANALYSIS OF ENIGMA, Heidi Williams, 2000, <a href="https://doi.org/10.1080/0161-110091888745">https://doi.org/10.1080/0161-110091888745</a>
+     * Uses Index of Coincidence for cryptanalysis.
+     * @see IoC IoC class
+     */
+    public final static Analysis IOC = new IoC();
+
+    /**
+     * Uses ngram of 2 for cryptanalysis.
+     * @see Ngram Ngram class
+     */
+    public final static Analysis BIGRAM = new Ngram(2);
+
+    /**
+     * Uses ngram of 3 for cryptanalysis.
+     * @see Ngram Ngram class
+     */
+    public final static Analysis TRIGRAM = new Ngram(3);
+
+    /**
+     * Uses ngram of 4 for cryptanalysis.
+     * @see Ngram Ngram class
+     */
+    public final static Analysis QUADGRAM = new Ngram(4);
+
+
+    // @param ngram         n-gram length used to score keys during phase 3
+
+    /**
+     * <p>The Decryptor class provide instance methods for decrypting Enigma-encoded text using ciphertext-only cryptanalysis.
+     * This implements the techniques of James Gillogly [1] and Heidi Williams' improvements [2].
+     * <p>[1] CIPHERTEXT-ONLY CRYPTANALYSIS OF ENIGMA, James J. Gillogly, 1995, <a href="https://web.archive.org/web/20060720040135/http://members.fortunecity.com/jpeschel/gillog1.htm">web.archive.org</a>
+     * <p>[2] APPLYING STATISTICAL LANGUAGE RECOGNITION TECHNIQUES IN THE CIPHERTEXT-ONLY CRYPTANALYSIS OF ENIGMA, Heidi Williams, 2000, <a href="https://doi.org/10.1080/0161-110091888745">https://doi.org/10.1080/0161-110091888745</a>
      *
      * @param ciphertext    the encrypted text to decipher
-     * @param ngram         n-gram length used to score keys during phase 3
-     * @param limit         maximum no. of keys to test in phases 2 and 3, ideally at least 2</br>
      */
-    public Decryptor(String ciphertext, int ngram, int limit) {
+    public Decryptor(String ciphertext) {
         this.ciphertext = clean(ciphertext);
-        this.ngram = new Ngram(ngram);
-        this.limit = limit;
     }
 
     /**
-     * The canonical main method to run.
-     * <p>
-     * This implementation extends the William's method slightly still.
-     * <p>
-     * This method essentially follows the sequence:
-     * <p>
-     * {@code var lst1 = bestWheelOrderAndRotorPositionKeys();} <br>
-     * {@code var lst2 = bestRingSettingKeys(lst1);} <br>
-     * {@code var best = bestPlugboardKey(lst2.getFirst());}
+     * <p>This method automatically performs the three steps described in Gillogly's paper:</p>
+     *  <ul>
+     *          1. Determine the best wheel & rotor position setting, by {@code IoC} (Index of Coincidence).
+     *      <br>2. Determine the best ring setting, using settings from step 1, again by {@code IoC}.
+     *      <br>3. Determine the best plugboard setting, using settings from step 2, by {@code ngrams}.
+     * </ul>
+     * <p>Heidi William extends Gillogly's by recording 3,000 of the best-scoring combinations from the first step
+     * instead of just the singular best, and choosing a better statistical technique.</p>
+     * <pre>{@code
+     *      String[] wheels = {"I", "II", "III", "IV", "V"};
      *
-     * @see #bestWheelOrderAndRotorPositionKeys()
-     * @see #bestRingSettingKeys(List)
-     * @see #bestPlugboardKey(ScoredEnigmaKey)
+     *      List<ScoredEnigmaKey> wheelPosKeys = bestWheelAndPositionKeys(wheels, Decryptor.IOC);
+     *      List<ScoredEnigmaKey> ringSettKeys = bestRingSettingKeys(wheelPosKeys, Decryptor.IOC);
+     *      ScoredEnigmaKey bestKey = bestPlugboardKey(ringSettKeys, Decryptor.BIGRAM);
+     *
+     *      return bestKey;
+     * }</pre>
      */
-    public void decrypt() {
-        var bestWheelAndPositions = bestWheelOrderAndRotorPositionKeys();
-        System.out.println();
-        var bestRingSettingKeys = bestRingSettingKeys(bestWheelAndPositions);
-        System.out.println();
-        var bestKey = bestPlugboardKey(bestRingSettingKeys);
-        System.out.println();
-
-        Enigma machine = new Enigma(bestKey);
-        System.out.println("BEST KEY ATTEMPT = " + bestKey);
-        System.out.println(machine.encrypt(ciphertext, "") + "\n");
+    public ScoredEnigmaKey decrypt() {
+        // we will assume the ciphertext is encrypted using an Enigma whose rotors support 5 types
+        return wheelCombinations(5).stream().parallel()
+                .map(w -> bestRotorPositionKey(w, IOC))
+                .map(k -> bestRingSettingKey(k, IOC))
+                .map(k -> bestPlugboardKey(k, BIGRAM))
+                .max(Comparator.comparing(ScoredEnigmaKey::score))
+                .get();
     }
 
     /**
      * The first phase in cracking the key.
      * <p>
-     * In {@link #decrypt()}, this method is called first and then passed to {@link #bestRingSettingKeys(List)}.
+     * In {@link #decrypt()}, this method is called first and then passed to {@link #bestRingSettingKeys(List, Analysis)}.
+     * <p>
+     * By far the most expensive step, averaging 10 keys per 60 wheel combination.
+     *
+     * @return {@link List} of {@link ScoredEnigmaKey} of cracked {@code wheel} and  {@code positions}.
+     *
+     * @see #decrypt()
+     */
+    public ScoredEnigmaKey bestRotorPositionKey(String[] wheelCombination, Analysis analysis) {
+        return crackRotorPosition(wheelCombination, analysis);
+    }
+
+    /**
+     * The first phase in cracking the key.
+     * <p>
+     * In {@link #decrypt()}, this method is called first and then passed to {@link #bestRingSettingKeys(List, Analysis)}.
      * <p>
      * By far the most expensive step, averaging 10 keys per 60 wheel combination.
      *
@@ -84,51 +106,10 @@ public class Decryptor {
      * 
      * @see #decrypt()
      */
-    public List<ScoredEnigmaKey> bestWheelOrderAndRotorPositionKeys() {
-        List<ScoredEnigmaKey> bestWheelAndPosKeys = new ArrayList<>();
-
-        Enigma machine = Enigma.createDefault();
-        String[] wheels = {"I", "II", "III", "IV", "V"};
-
-        for (String w1 : wheels) {
-
-            for (String w2 : wheels) {
-                if (w2.equals(w1)) continue;
-
-                for (String w3 : wheels) {
-                    if (w3.equals(w2) || w3.equals(w1)) continue;
-
-                    System.out.println(w1 + " " + w2 + " " + w3);
-
-                    machine.setWheels(w1, w2, w3);
-                    double perWheelBoundingScore = minScore();
-
-                    for (int p1 = 0; p1 < 26; p1++) {
-                        for (int p2 = 0; p2 < 26; p2++) {
-                            for (int p3 = 0; p3 < 26; p3++) {
-
-                                machine.setPositions(p1, p2, p3);
-
-                                var snapshotKey = machine.getEnigmaKeu();
-                                var attempt = machine.encrypt(ciphertext, "");
-                                var score = IoC.fitness(attempt);
-
-                                if (score > perWheelBoundingScore) {
-                                    perWheelBoundingScore = score;
-                                    var crackedWheelAndPos = new ScoredEnigmaKey(snapshotKey, score);
-                                    bestWheelAndPosKeys.add(crackedWheelAndPos);
-
-                                    System.out.println("CRACKED POS : " + crackedWheelAndPos);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        bestWheelAndPosKeys.sort(Collections.reverseOrder());
-        return bestWheelAndPosKeys;
+    public List<ScoredEnigmaKey> bestRotorPositionKeys(int types, Analysis analysis) {
+        return wheelCombinations(types).stream()
+                .map(c -> crackRotorPosition(c, analysis))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -138,19 +119,16 @@ public class Decryptor {
      * The rightmost rotor is turning so slow that it has no effect on the decryption whatsoever.
      * <p>
      * The positions turn together with the rings to find the optimal settings.
-     * <p>
-     * In {@link #decrypt()}, this method is called second and then passed to {@link #bestPlugboardKeys(List)}.
      *
-     * @param keys  {@link List} of {@link ScoredEnigmaKey} with {@code wheels} and {@code positions} <strong>already cracked and sorted in descending order</strong> for best results.
-     * @return      {@link List} of {@link ScoredEnigmaKey} of cracked {@code wheels}, {@code positions}, and {@code rings}, sorted in descending order, at most size {@link #limit}.
-     *
+     * @param keys         {@link List} of {@link ScoredEnigmaKey} with {@code wheels} and {@code positions} <strong>already cracked and sorted in descending order</strong> for best results.
+     * @param analysis     {@link Analysis} to calculate fitness score. Use fields {@link #IOC}, {@link #BIGRAM}, {@link #TRIGRAM}, or {@link #QUADGRAM}.
+     * @return {@link List} of {@link ScoredEnigmaKey} of cracked {@code wheels}, {@code positions}, and {@code rings}, sorted in descending order
      * @see #decrypt()
-     * @see #bestRingSettingKey(ScoredEnigmaKey)
+     * @see #bestRingSettingKey(ScoredEnigmaKey, Analysis)
      */
-    public List<ScoredEnigmaKey> bestRingSettingKeys(List<ScoredEnigmaKey> keys) {
+    public List<ScoredEnigmaKey> bestRingSettingKeys(List<ScoredEnigmaKey> keys, Analysis analysis) {
         return keys.stream()
-                .limit(limit)                                        // limit to highest-scoring keys
-                .map(this::bestRingSettingKey)                       // crack the ring setting
+                .map(k -> bestRingSettingKey(k, analysis))           // crack the ring setting
                 .sorted(Collections.reverseOrder())                  // sort by highest to lowest
                 .collect(Collectors.toCollection(ArrayList::new));   // collect into an ArrayList
     }
@@ -161,15 +139,15 @@ public class Decryptor {
      * First cracks the ring settings of the leftmost rotor, then the middle rotor.<br>
      * The rightmost rotor is turning so slow that it has no effect on the decryption whatsoever.
      *
-     * @param key {@link ScoredEnigmaKey} with {@code wheels} and {@code positions} <strong>already cracked</strong> for best results.
+     * @param key       {@link ScoredEnigmaKey} with {@code wheels} and {@code positions} <strong>already cracked</strong> for best results.
+     * @param analysis  {@link Analysis} to calculate fitness score. Use fields {@link #IOC}, {@link #BIGRAM}, {@link #TRIGRAM}, or {@link #QUADGRAM}.
      * @return {@link ScoredEnigmaKey} of cracked {@code wheels}, {@code positions}, and {@code rings}.
-     *
      * @see #decrypt()
-     * @see #bestRingSettingKeys(List)
+     * @see #bestRingSettingKeys(List, Analysis)
      */
-    public ScoredEnigmaKey bestRingSettingKey(ScoredEnigmaKey key) {
-        var r1 = crackedRingSetting(key, 2);                // crack the leftmost rotor
-        var r2 = crackedRingSetting(r1, 1);                   // crack the middle rotor
+    public ScoredEnigmaKey bestRingSettingKey(ScoredEnigmaKey key, Analysis analysis) {
+        var r1 = crackRingSetting(key, 2, analysis);      // crack the leftmost rotor
+        var r2 = crackRingSetting(r1, 1, analysis);       // crack the middle rotor
         System.out.println("CRACKED RINGS : " + r2);
         return r2;
 
@@ -182,13 +160,9 @@ public class Decryptor {
      *
      * @param key {@link ScoredEnigmaKey} with {@code wheels}, {@code positions}, and {@code rings} already cracked for best results.
      * @return {@link ScoredEnigmaKey}, fully-cracked for decrypting the ciphertext.
-     *
-     * @see #decrypt()
-     * @see #bestPlugboardKey(List)
-     * @see #bestPlugboardKeys(List)
      */
-    public ScoredEnigmaKey bestPlugboardKey(ScoredEnigmaKey key) {
-        return crackPlugboardPairs(key);
+    public ScoredEnigmaKey bestPlugboardKey(ScoredEnigmaKey key, Analysis analysis) {
+        return crackPlugboardPairs(key, analysis);
     }
 
     /**
@@ -196,15 +170,12 @@ public class Decryptor {
      * <p>
      * Attempts to crack the plugboard pairs. If scores do not improve, keep the key as is.
      *
-     * @param keys {@link List} of {@link ScoredEnigmaKey} with {@code wheels}, {@code positions}, and {@code rings} <strong>already cracked</strong> for best results.
+     * @param keys          {@link List} of {@link ScoredEnigmaKey} with {@code wheels}, {@code positions}, and {@code rings} <strong>already cracked</strong> for best results.
+     * @param analysis
      * @return {@link ScoredEnigmaKey}, fully-cracked for decrypting the ciphertext.
-     *
-     * @see #decrypt()
-     * @see #bestPlugboardKey(ScoredEnigmaKey) 
-     * @see #bestPlugboardKeys(List)
      */
-    public ScoredEnigmaKey bestPlugboardKey(List<ScoredEnigmaKey> keys) {
-        return bestPlugboardKeys(keys).getFirst();
+    public ScoredEnigmaKey bestPlugboardKey(List<ScoredEnigmaKey> keys, Analysis analysis) {
+        return bestPlugboardKeys(keys, analysis).getFirst();
     }
 
     /**
@@ -214,20 +185,48 @@ public class Decryptor {
      *
      * @param keys {@link List} of {@link ScoredEnigmaKey} with {@code wheels}, {@code positions}, and {@code rings} <strong>already cracked and sorted in descending order</strong> for best results.
      * @return {@link List} of {@link ScoredEnigmaKey}, fully-cracked keys for decrypting the ciphertext, sorted in descending order.
-     *
-     * @see #decrypt()
-     * @see #bestPlugboardKey(ScoredEnigmaKey)
-     * @see #bestPlugboardKey(List)
      */
-    public List<ScoredEnigmaKey> bestPlugboardKeys(List<ScoredEnigmaKey> keys) {
+    public List<ScoredEnigmaKey> bestPlugboardKeys(List<ScoredEnigmaKey> keys, Analysis analysis) {
         return keys.stream()
-                .limit(limit)
-                .map(this::crackPlugboardPairs)
+                .map(k -> crackPlugboardPairs(k, analysis))
                 .sorted(Collections.reverseOrder())
                 .collect(Collectors.toCollection(ArrayList::new));
     }
 
-    protected ScoredEnigmaKey crackedRingSetting(ScoredEnigmaKey key, int rotorIndex) {
+    protected ScoredEnigmaKey crackRotorPosition(String[] wheels, Analysis analysis) {
+        Enigma machine = Enigma.createDefault();
+        machine.setWheels(wheels);
+
+        double perWheelBoundingScore = minScore();
+        ScoredEnigmaKey crackedPositionKey = null;
+
+        for (int p1 = 0; p1 < 26; p1++) {
+            for (int p2 = 0; p2 < 26; p2++) {
+                for (int p3 = 0; p3 < 26; p3++) {
+
+                    machine.setPositions(p1, p2, p3);
+
+                    var snapshotKey = machine.getEnigmaKeu();
+                    String attempt = machine.encrypt(ciphertext, "");
+                    double score = analysis.score(attempt);
+
+                    if (score > perWheelBoundingScore) {
+                        perWheelBoundingScore = score;
+                        crackedPositionKey = new ScoredEnigmaKey(snapshotKey, score);
+                    }
+                }
+            }
+        }
+
+        var rev = crackedPositionKey != null
+                    ? crackedPositionKey
+                    : new ScoredEnigmaKey(machine.getEnigmaKeu(), perWheelBoundingScore);
+
+        System.out.println("CRACKED POS : " + rev);
+        return rev;
+    }
+
+    protected ScoredEnigmaKey crackRingSetting(ScoredEnigmaKey key, int rotorIndex, Analysis analysis) {
         Enigma machine = new Enigma(key);
 
         int[] ringSetting = key.rings;
@@ -243,7 +242,7 @@ public class Decryptor {
 
             EnigmaKey snapshotKey = machine.getEnigmaKeu();
             String attempt = machine.encrypt(ciphertext, "");
-            double score = IoC.fitness(attempt);
+            double score = analysis.score(attempt);
 
             if (score > boundingScore) {
                 boundingScore = score;
@@ -257,14 +256,14 @@ public class Decryptor {
         return bestRingPositionKey;
     }
 
-    protected ScoredEnigmaKey crackPlugboardPairs(EnigmaKey key) {
+    protected ScoredEnigmaKey crackPlugboardPairs(EnigmaKey key, Analysis analysis) {
         Enigma machine = new Enigma(key);
 
         String currentDecryption = machine.encrypt(ciphertext, "");
         machine.resetPositions();
 
         ArrayList<String> plugboardPairs = new ArrayList<>(Arrays.asList(key.pairs));
-        double boundingPlugboardScore = ngram.score(currentDecryption);
+        double boundingPlugboardScore = analysis.score(currentDecryption);
         ScoredEnigmaKey bestPlugboardKey = new ScoredEnigmaKey(key, boundingPlugboardScore);
 
         for (int i = 0; i < 7; i++) {
@@ -281,14 +280,13 @@ public class Decryptor {
 
                     String pair = p1 + "" + p2;
 
-
                     plugboardPairs.add(pair);
                     machine.setPlugboard(plugboardPairs);
 
                     String attempt = machine.encrypt(ciphertext, "");
                     machine.resetPositions();
 
-                    double score = ngram.score(attempt);
+                    double score = analysis.score(attempt);
 
                     if (score > boundingPairsScore) {
                         bestPair = pair;
@@ -311,6 +309,27 @@ public class Decryptor {
 
         System.out.println("CRACKED PLUGBOARD : " + bestPlugboardKey);
         return bestPlugboardKey;
+    }
+
+    private static List<String[]> wheelCombinations(int types) {
+        List<String[]> combinations = new ArrayList<>();
+
+        String[] wheels = switch (types) {
+            case 5 -> new String[] {"I", "II", "III", "IV", "V"};
+            case 8 -> new String[] {"I", "II", "III", "IV", "V", "VI", "VII", "VIII"};
+            default -> throw new UnsupportedOperationException();
+        };
+
+        for (String w1 : wheels) {
+            for (String w2 : wheels) {
+                if (w2.equals(w1)) continue;
+                for (String w3 : wheels) {
+                    if (w3.equals(w2) || w3.equals(w1)) continue;
+                    combinations.add(new String[]{w1, w2, w3});
+                }
+            }
+        }
+        return combinations;
     }
 
     private static String clean(String text) {

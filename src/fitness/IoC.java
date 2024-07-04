@@ -2,13 +2,18 @@ package src.fitness;
 
 import java.util.Arrays;
 
-public class IoC {
-    public static float fitness(String str) {
+public class IoC implements Analysis {
+
+    public double score(String str) {
         int[] histogram = new int[26];
 
-        for (char c : str.toUpperCase().toCharArray()) if (c >= 'A' && c <= 'Z') histogram[c - 65]++;
+        str.toUpperCase()
+                .chars()
+                .filter(c -> c >= 'A' && c <= 'Z')
+                .forEach(c -> histogram[c - 65]++);
 
-        float frequencySum = Arrays.stream(histogram)
+        float frequencySum = Arrays
+                .stream(histogram)
                 .map(f -> f * (f - 1))
                 .sum();
 
