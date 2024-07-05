@@ -15,11 +15,11 @@ public class Enigma {
     public final int ROTOR_COUNT = 3;
     public final int LETTER_COUNT = 26;
 
-    private String[] pairs;
     private String reflectorModel;
     private final int[] reflector = new int[LETTER_COUNT];
     private final Rotor[] rotors = new Rotor[ROTOR_COUNT];
-    private final HashMap<Character, Character> plugboard = new HashMap<>();
+    private final List<String> pairs = new ArrayList<>();
+    private final HashMap<Character, Character> plugboardMap = new HashMap<>();
 
     /**
      * Java implementation of the 3-rotor Enigma (model M3) used during
@@ -81,24 +81,16 @@ public class Enigma {
         );
     }
 
-    public static Enigma copyOf(Enigma e) {
-        return new Enigma(e.getWheels(), e.getRingSettings(), e.getPositions(), "B", e.getPluggedPairs());
-    }
-
-    public String encrypt(String plaintext, String sep) {
-        verifyNonNull(plaintext, "plaintext");
-
-        return plaintext
-                .toUpperCase()
+    public String encrypt(String plaintext) {
+        return plaintext.toUpperCase()
                 .chars()
-                .filter(c -> (c >= 'A' && c <= 'Z') || c == ' ')
+                .filter(c -> (c >= 'A' && c <= 'Z'))
                 .map(c -> cipher((char) c))
                 .collect(
                         StringBuilder::new,
                         StringBuilder::appendCodePoint,
                         StringBuilder::append)
-                .toString()
-                .replaceAll(" ", sep);
+                .toString();
     }
 
     protected char cipher(char c) {
@@ -115,7 +107,7 @@ public class Enigma {
     }
 
     public char getPairOf(char c) {
-        return plugboard.getOrDefault(c, c);
+        return plugboardMap.getOrDefault(c, c);
     }
 
     public void setReflector(String model) {
@@ -147,7 +139,9 @@ public class Enigma {
      * @see #getPluggedPairs()
      */
     public void setPlugboard(Collection<String> pairs) {
-        setPlugboard( pairs == null ? null : pairs.toArray(new String[0]) );
+        plugboardMap.clear();
+        this.pairs.clear();
+        pairs.forEach(this::addPlugboardPair);
     }
 
     /**
@@ -162,28 +156,20 @@ public class Enigma {
      * @see #getPluggedPairs()
      */
     public void setPlugboard(String[] pairs) {
-        verifyNonNull(pairs, "pairs");
+        setPlugboard(List.of(pairs));
+    }
 
-        plugboard.clear();
-        String[] pairsTemp = new String[pairs.length];
+    public void addPlugboardPair(String pair) {
+        pair = pair.toUpperCase();
+        char p1 = pair.charAt(0);
+        char p2 = pair.charAt(1);
 
-        for (int i = 0; i < pairs.length; i++) {
-            verifyNonNull(pairs[i], "pair");
+        if (pair.length() != 2 || !(isValidLetter(p1) && isValidLetter(p2))) throw new IllegalArgumentException("pair must be a string of two letters");
+        if (plugboardMap.containsKey(p1) || plugboardMap.containsKey(p2)) throw new IllegalArgumentException("one of the letters is already paired: `" + p1 +  p2 + "`");
 
-            char[] p = pairs[i].toUpperCase().toCharArray();
-            char p1 = p[0];
-            char p2 = p[1];
-
-            if (p.length != 2 || !(isValidLetter(p1) && isValidLetter(p2))) throw new IllegalArgumentException("pair must be a string of two letters");
-
-            if (plugboard.containsKey(p1) || plugboard.containsKey(p2)) throw new IllegalArgumentException("one of the letters is already paired: `" + p1 +  p2 + "`");
-
-            plugboard.put(p1, p2);
-            plugboard.put(p2, p1);
-            pairsTemp[i] = p1 + "" + p2;
-        }
-
-        this.pairs = pairsTemp;
+        plugboardMap.put(p1, p2);
+        plugboardMap.put(p2, p1);
+        pairs.add(pair);
     }
 
     /**
@@ -298,8 +284,8 @@ public class Enigma {
     }
 
     public void resetPlugboard() {
-        this.pairs = new String[]{};
-        this.plugboard.clear();
+        pairs.clear();
+        plugboardMap.clear();
     }
 
     /**
@@ -355,7 +341,7 @@ public class Enigma {
      * @see #setPlugboard(Collection)
      */
     public String[] getPluggedPairs() {
-        return Arrays.copyOf(pairs, pairs.length);
+        return pairs.toArray(new String[0]);
     }
 
     /**
@@ -382,7 +368,7 @@ public class Enigma {
      * @return {@link EnigmaKey} snapshot key of the machine's current rotor states and plugboard pairs.
      */
     public EnigmaKey getEnigmaKeu() {
-        return new EnigmaKey(getWheels(), getRingSettings(), getPositions(), pairs);
+        return new EnigmaKey(getWheels(), getRingSettings(), getPositions(), pairs.toArray(new String[0]));
     }
 
     public String toString() {
@@ -391,7 +377,7 @@ public class Enigma {
                 Arrays.toString(getRingSettings()),
                 Arrays.toString(getPositions()),
                 reflectorModel,
-                Arrays.toString(pairs)
+                pairs
         );
     }
 

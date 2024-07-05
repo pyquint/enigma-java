@@ -256,52 +256,50 @@ public class Decryptor {
         return bestRingPositionKey;
     }
 
-    protected ScoredEnigmaKey crackPlugboardPairs(EnigmaKey key, Analysis analysis) {
+    protected ScoredEnigmaKey crackPlugboardPairs(ScoredEnigmaKey key, Analysis analysis) {
         Enigma machine = new Enigma(key);
 
-        String currentDecryption = machine.encrypt(ciphertext, "");
+        String currentDecryption = machine.encrypt(CIPHERTEXT);
         machine.resetPositions();
-
-        ArrayList<String> plugboardPairs = new ArrayList<>(Arrays.asList(key.pairs));
         double boundingPlugboardScore = analysis.score(currentDecryption);
+
         ScoredEnigmaKey bestPlugboardKey = new ScoredEnigmaKey(key, boundingPlugboardScore);
 
-        for (int i = 0; i < 7; i++) {
+        List<String> bestPairs = new ArrayList<>(Arrays.asList(key.pairs));
+        String checked = String.join("", bestPairs);
 
+        for (int i = 0; i < 10; i++) {
             String bestPair = null;
-            String checked = String.join("", plugboardPairs);
             double boundingPairsScore = boundingPlugboardScore;
 
-            for (char p1 = 'a'; p1 <= 'z'; p1++) {
+            for (char p1 = 'A'; p1 <= 'Z'; p1++) {
                 if (checked.indexOf(p1) != -1) continue;
 
-                for (char p2 = 'a'; p2 <= 'z'; p2++) {
+                for (char p2 = 'A'; p2 <= 'Z'; p2++) {
                     if (p1 == p2 || checked.indexOf(p2) != -1) continue;
 
                     String pair = p1 + "" + p2;
 
-                    plugboardPairs.add(pair);
-                    machine.setPlugboard(plugboardPairs);
+                    machine.setPlugboard(bestPairs);
+                    machine.addPlugboardPair(pair);
 
-                    String attempt = machine.encrypt(ciphertext, "");
+                    var snapshotKey = machine.getEnigmaKeu();
+                    String attempt = machine.encrypt(CIPHERTEXT);
                     machine.resetPositions();
-
                     double score = analysis.score(attempt);
 
                     if (score > boundingPairsScore) {
                         bestPair = pair;
                         boundingPairsScore = score;
-                        bestPlugboardKey = new ScoredEnigmaKey(machine.getEnigmaKeu(), score);
-                        machine.resetPlugboard();
+                        bestPlugboardKey = new ScoredEnigmaKey(snapshotKey, score);
                     }
-
-                    plugboardPairs.remove(pair);
                 }
             }
 
             if (bestPair != null && boundingPairsScore > boundingPlugboardScore) {
                 boundingPlugboardScore = boundingPairsScore;
-                plugboardPairs.add(bestPair);
+                bestPairs.add(bestPair);
+                checked += bestPair;
             } else {
                 break;
             }
