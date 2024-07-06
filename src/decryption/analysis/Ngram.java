@@ -1,4 +1,4 @@
-package src.fitness;
+package src.decryption.analysis;
 
 import java.io.File;
 import java.io.IOException;
@@ -7,22 +7,23 @@ import java.util.HashMap;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-public class Ngram implements Analysis {
+public class Ngram implements FitnessFunction {
+    private final String name;
     private final int n;
     private final HashMap<String, Double> ngramMap;
 
     public Ngram(int ngram) {
-        String n = switch (ngram) {
-            case 2 -> "bi";
-            case 3 -> "tri";
-            case 4 -> "quad";
+        name = switch (ngram) {
+            case 2 -> "bigram";
+            case 3 -> "trigram";
+            case 4 -> "quadgram";
             default -> throw new IllegalArgumentException("Unsupported ngram. Currently 1, 2, or 3 only.");
         };
 
-        this.n = ngram;
-        this.ngramMap = new HashMap<>();
+        n = ngram;
+        ngramMap = new HashMap<>();
 
-        try (Stream<String> stream = Files.lines(new File("data/" + n + "grams.txt").toPath())) {
+        try (Stream<String> stream = Files.lines(new File("data/" + name + "s.txt").toPath())) {
             stream.map(l -> l.split(","))
                     .forEach(l -> ngramMap.put(l[0], Double.valueOf(l[1])));
         } catch (IOException e) {
@@ -40,6 +41,11 @@ public class Ngram implements Analysis {
                     return (val != null) ? val : -12.0;
                 })
                 .sum();
+    }
+
+    @Override
+    public String name() {
+        return name;
     }
 
 }

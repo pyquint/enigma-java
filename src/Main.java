@@ -1,11 +1,10 @@
 package src;
 
-import src.fitness.ScoredEnigmaKey;
-import src.machine.Decryptor;
+import src.decryption.key.EnigmaKey;
+import src.decryption.key.ScoredKey;
+import src.decryption.Decryptor;
 import src.machine.Enigma;
 import src.machine.Rotor;
-
-import java.util.Optional;
 
 // compile first then run
 
@@ -22,7 +21,7 @@ public class Main {
     public static void main(String[] args) {
         Enigma enigma = Enigma.createDefault();
 
-        String ciphertext1 = enigma.encrypt("AAAA AAAA AAAA AAA", " ");
+        String ciphertext1 = enigma.encrypt("AAAA AAAA AAAA AAA");
         System.out.println("ciphertext: " + ciphertext1);
 
         // enigma.encrypt("AAAA AAAA AAAA AAA", " ")
@@ -31,7 +30,7 @@ public class Main {
         enigma.resetPositions();
 
         String foxInSocks = "Fox, Socks, Box, Knox. Knox in box. Fox in socks. Knox on fox in socks in box. Socks on Knox and Knox in box. Fox in socks on box on Knox.";
-        String ciphertext2 = enigma.encrypt(foxInSocks, "");
+        String ciphertext2 = enigma.encrypt(foxInSocks);
         System.out.println("fox in socks: " + ciphertext2);
 
         // "Fox, Socks, Box, Knox. Knox in box. Fox in socks. Knox on fox in socks in box. Socks on Knox and Knox in box. Fox in socks on box on Knox."
@@ -50,7 +49,7 @@ public class Main {
         System.out.println();
 
         String a = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-        String ciphertext3 = enigma.encrypt(a, "");
+        String ciphertext3 = enigma.encrypt(a);
         System.out.println("a: " + ciphertext3);
         // - BTOZNTVXJRPEFOVFVGYZIGDQUJRONHFLQLILMCZZYLVHRPOEKQIGS
 
@@ -66,10 +65,31 @@ public class Main {
         var test = imitationGameWithPlugs;
 
         Decryptor decryptor = new Decryptor(test);
-        ScoredEnigmaKey bestKey = decryptor.decrypt();
-        System.out.println();
-        Enigma e = new Enigma(bestKey);
-        System.out.println("Best key: " + bestKey);
-        System.out.println(e.encrypt(test, ""));
+//        ScoredKey bestKey = decryptor.decrypt();
+
+// region debug
+        var e1 = Enigma.createDefault();
+        var w = e1.wheels();
+        var k = new EnigmaKey(w, e1.ringSettings(), e1.positions(), e1.plugboardPairs());
+        System.out.println(k);
+        w[0] = "IV";
+        System.out.println(k);
+
+
+        //        e1.setWheels("V", "IV", "I");
+//        e1.setRingSettings(7, 20, 19);
+//        e1.setPositions(1, 15, 23);
+//        e1.setPlugboard(List.of("sx", "bp", "eu", "nz"));
+//
+//        var k = e1.getEnigmaKeu();
+//        var s = e1.encrypt(test);
+//        var f = Decryptor.BIGRAM.score(s);
+//
+//        System.out.println(decryptor.bestPlugboardKey(new ScoredEnigmaKey(k, f, "bigram"), Decryptor.BIGRAM));
+// endregion
+
+//        Enigma e = new Enigma(bestKey);
+//        System.out.println("Best key: " + bestKey);
+//        System.out.println(e.encrypt(test));
     }
 }

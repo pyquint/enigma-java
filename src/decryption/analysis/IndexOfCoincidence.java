@@ -1,8 +1,8 @@
-package src.fitness;
+package src.decryption.analysis;
 
 import java.util.Arrays;
 
-public class IoC implements Analysis {
+public class IndexOfCoincidence implements FitnessFunction {
 
     public double score(String str) {
         int[] histogram = new int[26];
@@ -20,5 +20,10 @@ public class IoC implements Analysis {
         int length = Arrays.stream(histogram).sum();
 
         return frequencySum / (length * (length - 1));
+    }
+
+    @Override
+    public String name() {
+        return "IoC";
     }
 }
