@@ -65,18 +65,10 @@ public class Main {
         var test = imitationGameWithPlugs;
 
         Decryptor decryptor = new Decryptor(test);
-//        ScoredKey bestKey = decryptor.decrypt();
+        ScoredKey bestKey = decryptor.decrypt();
 
 // region debug
-        var e1 = Enigma.createDefault();
-        var w = e1.wheels();
-        var k = new EnigmaKey(w, e1.ringSettings(), e1.positions(), e1.plugboardPairs());
-        System.out.println(k);
-        w[0] = "IV";
-        System.out.println(k);
-
-
-        //        e1.setWheels("V", "IV", "I");
+//        e1.setWheels("V", "IV", "I");
 //        e1.setRingSettings(7, 20, 19);
 //        e1.setPositions(1, 15, 23);
 //        e1.setPlugboard(List.of("sx", "bp", "eu", "nz"));
@@ -88,8 +80,8 @@ public class Main {
 //        System.out.println(decryptor.bestPlugboardKey(new ScoredEnigmaKey(k, f, "bigram"), Decryptor.BIGRAM));
 // endregion
 
-//        Enigma e = new Enigma(bestKey);
-//        System.out.println("Best key: " + bestKey);
-//        System.out.println(e.encrypt(test));
+        Enigma e = new Enigma(bestKey);
+        System.out.println("Best key: " + bestKey);
+        System.out.println(e.encrypt(test));
     }
 }
