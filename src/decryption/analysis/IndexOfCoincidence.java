@@ -21,9 +21,4 @@ public class IndexOfCoincidence implements FitnessFunction {
 
         return frequencySum / (length * (length - 1));
     }
-
-    @Override
-    public String name() {
-        return "IoC";
-    }
 }

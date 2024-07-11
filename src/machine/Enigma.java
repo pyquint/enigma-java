@@ -305,10 +305,8 @@ public class Enigma {
     }
 
     /**
-     * This returns a new copy to get a view the current wheel types per rotor.
-     * <p>
-     * Any changes to that will not reflect to the internal states.
-     *
+     * <p>This returns a new copy to get a view the current wheel types per rotor.
+     * <p>Any changes to that will not reflect to the internal states.
      * @return {@link String} array object of length three.
      *
      * @see #setWheels(String[])
@@ -319,10 +317,8 @@ public class Enigma {
     }
 
     /**
-     * This returns a new copy to get a view of the current {@code rings} per {@link Rotor}.
-     * <p>
-     * Any changes to that will not reflect to the internal states.
-     *
+     * <p>This returns a new copy to get a view of the current {@code rings} per {@link Rotor}.
+     * <p>Any changes to that will not reflect to the internal states.
      * @return {@code int} array object of length three.
      *
      * @see #setPlugboard(String[])

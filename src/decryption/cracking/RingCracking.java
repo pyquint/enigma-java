@@ -6,48 +6,69 @@ import src.decryption.key.EnigmaKey;
 import src.decryption.key.ScoredKey;
 import src.machine.Enigma;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+/**
+ * <p>The second phase only needs turning the 3rd and 2nd rotors.
+ *
+ * <p>We first go through all values of the 3rd leftmost rotor (index of 2), turning
+ * the ring setting as well as the position, but keeping the other two rotors static.
+ * We may get a new position combination in the process.
+ *
+ * <p>Use this new key for finding the optimal 2nd rotor (index of 1). We turn the
+ * middle rotor's ring setting and position, again keeping the other two rotors static.
+ *
+ * <p>We have now optimized our rotors. The next step is to crack the plugboard.
+ */
 public class RingCracking {
+
     /**
-     * <p>The second phase in cracking the key.
-     * <p>First cracks the ring settings of the leftmost rotor, then the middle rotor.
-     * <br>The rightmost rotor is turning so slow that it has no effect on the decryption whatsoever.
-     * <p>The positions turn together with the rings to find the optimal settings.
+     * <p>This phase expects to receive scored keys with wheels and positions,
+     * such as those generated from phase one.
      *
-     * @param keys       {@link List} of {@link ScoredKey} with {@code wheels} and {@code positions} already cracked
-     * @param ciphertext
-     * @param analysis   statistical method to use in calculating fitness score
-     * @return {@link List} of {@link ScoredKey} of cracked {@code wheels}, {@code positions}, and {@code rings}, sorted in descending order
+     * @param keys      streamable collection of keys
+     * @param analysis  fitness function
+     * @return          {@link ScoredKey}
+     * @see PositionCracking
      */
-    public static List<ScoredKey> bestRingSettingKeys(List<ScoredKey> keys, String ciphertext, FitnessFunction analysis) {
-        return keys.stream()
-                .map(k -> bestRingSettingKey(k, ciphertext, analysis))           // crack the ring setting
-                .sorted(Collections.reverseOrder())                  // sort by highest to lowest
-                .collect(Collectors.toCollection(ArrayList::new));   // collect into an ArrayList
+    public static List<ScoredKey> bestRingKeys(List<ScoredKey> keys, String ciphertext, FitnessFunction analysis) {
+        return bestRingKeysStream(keys, ciphertext, analysis).toList();
+    }
+
+    public static Stream<ScoredKey> bestRingKeysStream(List<ScoredKey> keys, String ciphertext, FitnessFunction analysis) {
+        return keys.stream().map(k -> bestRingKey(k, ciphertext, analysis));
     }
 
     /**
-     * <p>The second phase in cracking the key.
-     * <p>First cracks the ring settings of the leftmost rotor, then the middle rotor.
-     * <br>The rightmost rotor is turning so slow that it has no effect on the decryption whatsoever.
+     * <p>The second phase cracking the key.
      *
-     * @param key      {@link ScoredKey} with {@code wheels} and {@code positions} already cracked
-     * @param analysis statistical method to use in calculating fitness score
-     * @return {@link ScoredKey} with cracked {@code wheels}, {@code positions}, and {@code rings}
+     * <p>Finds the optimized position and ring setting for the wheel.
+     * During this process, the positions is turned alongside the ring settings.
+     * Returns a key with wheels, rings settings and positions.
+     *
+     * <p>This step expects to receive keys created from phase one.
+     *
+     * @param key       key with wheels and positions
+     * @param analysis  fitness function
+     * @return          {@link ScoredKey}
+     * @see PositionCracking
      */
-    public static ScoredKey bestRingSettingKey(ScoredKey key, String ciphertext, FitnessFunction analysis) {
+    public static ScoredKey bestRingKey(ScoredKey key, String ciphertext, FitnessFunction analysis) {
         var r1 = crackRingSetting(key, ciphertext, 2, analysis);      // crack the leftmost rotor
         var r2 = crackRingSetting(r1, ciphertext, 1, analysis);       // crack the middle rotor
-        System.out.println("CRACKING RINGS : " + r2);
         return r2;
-
     }
 
-    protected static ScoredKey crackRingSetting(ScoredKey key, String ciphertext, int rotorIndex, FitnessFunction analysis) {
+    /**
+     * @param key           key with wheels and positions, with rings if {@code index} is {@code 1}
+     * @param ciphertext    text to decrypt
+     * @param index         index of rotor
+     * @param analysis      fitness function
+     * @return {            @link ScoredKey}
+     * @see PlugboardCracking
+     */
+    protected static ScoredKey crackRingSetting(ScoredKey key, String ciphertext, int index, FitnessFunction analysis) {
         Enigma machine = new Enigma(key);
 
         int[] ringSetting = key.rings();
@@ -70,8 +91,8 @@ public class RingCracking {
                 bestRingPositionKey = new ScoredKey(snapshotKey, score);
             }
 
-            ringSetting[rotorIndex]++;
-            rotorPosition[rotorIndex] = Math.abs(Math.floorMod(rotorPosition[rotorIndex] + 1, 26));
+            ringSetting[index]++;
+            rotorPosition[index] = Math.abs(Math.floorMod(rotorPosition[index] + 1, 26));
         }
 
         return bestRingPositionKey;

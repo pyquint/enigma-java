@@ -58,29 +58,31 @@ public class Decryptor {
      * </ul>
      * <p>Heidi William extends Gillogly's by recording 3,000 of the best-scoring combinations from the first step
      * instead of just the singular best, and choosing a better statistical technique.
-     * <p>{@link src.decryption.cracking.PositionCracking#bestRotorPositionKeys}'s impl
+     * <p>{@link src.decryption.cracking.PositionCracking#scoredWheelPosKeys}'s impl
      *
      * @return {@link ScoredKey} of the best-scoring Enigma settings
      * @see #decryptParallel()
      */
     public ScoredKey decrypt() {
         // phase 1
-        var hold = PositionCracking.generateAllPositionKeys(5, CIPHERTEXT, IOC).stream()
-                .sorted(Comparator.reverseOrder())
-                .toList();
+        var hold = PositionCracking.scoredKeysStream(5, CIPHERTEXT, IOC)
+                .peek(k -> System.out.printf("SCORING POSITIONS :: wheels=%s, positions=%s, score=%f\r", Arrays.toString(k.wheels()), Arrays.toString(k.positions()), k.score()))
+                .sorted(Comparator.reverseOrder());
 
         // phase 2
-        hold = hold.stream()
+        hold = hold
+                .peek(k -> System.out.printf("CRACKING RINGS :: wheels=%s, rings=%s, positions=%s score=%f\r", Arrays.toString(k.wheels()), Arrays.toString(k.positions()), Arrays.toString(k.rings()), k.score()))
                 .limit(3000)
-                .map(k -> RingCracking.bestRingSettingKey(k, CIPHERTEXT, IOC))
-                .sorted(Comparator.reverseOrder())
-                .toList();
+                .map(k -> RingCracking.bestRingKey(k, CIPHERTEXT, IOC))
+                .sorted(Comparator.reverseOrder());
 
         //phase 3
-        return hold.stream()
+        return hold
                 .limit(5)
                 .map(k -> PlugboardCracking.bestPlugboardKey(k, CIPHERTEXT, BIGRAM))
-                .max(Comparator.comparing(ScoredKey::score)).get();
+                .peek(k -> System.out.printf("CRACKING PLUGBOARD :: %s\r", k))
+                .max(Comparator.comparing(ScoredKey::score))
+                .get();
     }
 
     /**
@@ -99,11 +101,15 @@ public class Decryptor {
      */
     public ScoredKey decryptParallel() {
         // we will assume the ciphertext is encrypted using an Enigma whose rotors support 5 types
-        return PositionCracking.generateAllPositionKeysStream(5, CIPHERTEXT, IOC).parallel()
+        return
+            PositionCracking.scoredKeysStream(5, CIPHERTEXT, IOC)
+                .parallel()
                 .sorted(Comparator.reverseOrder())
                 .limit(100)
-                .map(k -> RingCracking.bestRingSettingKey(k, CIPHERTEXT, IOC))
+
+                .map(k -> RingCracking.bestRingKey(k, CIPHERTEXT, IOC))
                 .map(k -> PlugboardCracking.bestPlugboardKey(k, CIPHERTEXT, BIGRAM))
+
                 .max(Comparator.comparing(ScoredKey::score))
                 .get();
     }

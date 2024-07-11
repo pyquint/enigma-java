@@ -42,10 +42,4 @@ public class Ngram implements FitnessFunction {
                 })
                 .sum();
     }
-
-    @Override
-    public String name() {
-        return name;
-    }
-
 }

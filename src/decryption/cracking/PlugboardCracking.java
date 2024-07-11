@@ -99,7 +99,6 @@ public class PlugboardCracking {
             }
         }
 
-        System.out.println("CRACKING PLUGBOARD : " + bestPlugboardKey);
         return bestPlugboardKey;
     }
 }
